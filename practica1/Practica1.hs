@@ -1,21 +1,18 @@
 module Practica1 where
 --Ejercicio 1
 type Variable = String
-
 --Ejemplos
 --Var "p0"
 --Var "a"
 --Var "variable"
-
+--Var "EstaNoEsUnaVariable"
 
 --Ejercicio 2
 type Valuacion = [(Variable,Bool)]
-
 --Ejemplos
 --[("a",True)]
 --[("b",false),("c",True)]
 --[("a",True),("b",false),("c",True)]
-
 
 --Ejercicio 3
 variablesUsadas :: PL -> [Variable]
@@ -27,6 +24,7 @@ variablesUsadas phi = case phi of
     Dis a b -> quitaDuplicados((variablesUsadas a)++(variablesUsadas b))
     Con a b -> quitaDuplicados((variablesUsadas a)++(variablesUsadas b))
     Nand a b -> quitaDuplicados((variablesUsadas a)++(variablesUsadas b))
+    Nor a b -> quitaDuplicados((variablesUsadas a)++(variablesUsadas b))
     Neg a -> quitaDuplicados((variablesUsadas a))
 -- Tests:
 -- variablesUsadas Bot
@@ -53,9 +51,8 @@ quitaElemento ::Variable -> [Variable] -> [Variable]
 quitaElemento a [] = []
 quitaElemento a (x:xs) = if a==x then quitaElemento a xs else [x]++quitaElemento a xs
 
-
 --Ejercicio 4
-data PL = Bot | Top | Var Variable | Imp PL PL | Dis PL PL | Con PL PL | Neg PL | Nand PL PL
+data PL = Bot | Top | Var Variable | Imp PL PL | Dis PL PL | Con PL PL | Neg PL | Nand PL PL | Nor PL PL
 instance Show PL where
  show(Bot)= "⊥"
  show(Top)= "⊤"
@@ -65,6 +62,7 @@ instance Show PL where
  show(Con a b)= "("++show(a)++" ⋀ "++show(b)++")"
  show(Neg a)= "¬"++show(a)
  show(Nand a b)="("++show(a)++"⊼"++show(b)++")"
+ show(Nor a b)="("++show(a)++"⊽"++show(b)++")"
 
 numConjunciones :: PL -> Int
 numConjunciones phi = case phi of
@@ -76,6 +74,7 @@ numConjunciones phi = case phi of
     Dis a b -> 0+numConjunciones(a)+numConjunciones(b)
     Imp a b -> 0+numConjunciones(a)+numConjunciones(b)
     Nand a b -> 0+numConjunciones(a)+numConjunciones(b)
+    Nor a b -> 0+numConjunciones(a)+numConjunciones(b)
 -- Tests:
 -- numConjunciones Bot
 -- numConjunciones Top
@@ -98,6 +97,7 @@ quitaImp phi = case phi of
     Dis a b -> Dis (quitaImp a) (quitaImp b)
     Imp a b -> Dis (Neg (quitaImp a)) (quitaImp b)
     Nand a b -> Nand (quitaImp a) (quitaImp b)
+    Nor a b -> Nor (quitaImp a) (quitaImp b)
 -- Tests:
 -- quitaImp Bot
 -- quitaImp Top
@@ -119,6 +119,7 @@ quitaAnd phi = case phi of
     Dis a b -> Dis (quitaAnd a) (quitaAnd b)
     Imp a b -> Imp (quitaAnd a) (quitaAnd b)
     Nand a b -> Nand (quitaAnd a) (quitaAnd b)
+    Nor a b -> Nor (quitaAnd a) (quitaAnd b)
 -- Tests:
 -- quitaAnd Bot
 -- quitaAnd Top
@@ -140,6 +141,7 @@ quitaOr phi = case phi of
     Dis a b -> Con (Neg (quitaAnd a)) (Neg (quitaAnd b))
     Imp a b -> Imp (quitaOr a) (quitaOr b)
     Nand a b -> Nand (quitaOr a) (quitaOr b)
+    Nor a b -> Nor (quitaOr a) (quitaOr b)
 -- Tests:
 -- quitaOr Bot
 -- quitaOr Top
@@ -152,17 +154,41 @@ quitaOr phi = case phi of
 -- quitaOr (Dis (Dis (Var "a") (Var "b")) (Dis (Var "c") (Var "d")))
 
 --Ejercicio 6
+lNand :: PL -> PL
+lNand phi = case phi of
+    Bot -> Bot
+    Top -> Top
+    Var a -> Var a
+    Neg a -> Nand (lNand a) (lNand a)
+    Con a b -> Nand (Nand (lNand a) (lNand b)) (Nand (lNand a) (lNand b))
+    Dis a b -> Nand (Nand (lNand a) (lNand a)) (Nand (lNand b) (lNand b))
+    Imp a b -> Nand (Nand (Nand (lNand a) (lNand a)) (Nand (lNand a) (lNand a))) (Nand (lNand b) (lNand b))
+    Nand a b -> Nand (lNand a) (lNand b)
+    Nor a b -> Nand (Nand (Nand (lNand a) (lNand a)) (Nand (lNand b) (lNand b))) (Nand (Nand (lNand a) (lNand a)) (Nand (lNand b) (lNand b)))
+-- Tests:
+-- lNand Bot
+-- lNand Top
+-- lNand (Var "a")
+-- lNand (Neg(Var "a"))
+-- lNand (Imp (Var "a") (Var "b"))
+-- lNand (Dis (Var "a") (Var "b"))
+-- lNand (Con (Var "a") (Var "b"))
+-- lNand (Nand (Var "a") (Var "b"))
+-- lNand (Nor (Var "a") (Var "b"))
+-- lNand (Dis (Dis (Var "a") (Var "b")) (Dis (Var "c") (Var "d")))
+
 lNor :: PL -> PL
 lNor phi = case phi of
     Bot -> Bot
     Top -> Top
     Var a -> Var a
-    Neg a -> Nand (lNor a) (lNor a)
-    Con a b -> Nand (Nand (lNor a) (lNor b)) (Nand (lNor a) (lNor b))
-    Dis a b -> Nand (Nand (lNor a) (lNor a)) (Nand (lNor b) (lNor b))
-    Imp a b -> Nand (Nand (Nand (lNor a) (lNor a)) (Nand (lNor a) (lNor a))) (Nand (lNor b) (lNor b))
-    Nand a b -> Nand (lNor a) (lNor b)
--- Tests:
+    Neg a -> Nor (lNor a) (lNor a)
+    Con a b -> Nor (Nor (lNor a) (lNor a)) (Nor (lNor b) (lNor b))
+    Dis a b -> Nor (Nor (lNor a) (lNor b)) (Nor (lNor a) (lNor b))
+    Imp a b -> Nor (Nor (Nor (lNor a) (lNor a)) (lNor b)) (Nor (Nor (lNor a) (lNor a)) (lNor b))
+    Nand a b -> Nor (Nor (Nor (lNor a) (lNor a)) (Nor (lNor b) (lNor b))) (Nor (Nor (lNor a) (lNor a)) (Nor (lNor b) (lNor b)))
+    Nor a b -> Nor (lNor a) (lNor b)
+--Tests:
 -- lNor Bot
 -- lNor Top
 -- lNor (Var "a")
@@ -171,7 +197,8 @@ lNor phi = case phi of
 -- lNor (Dis (Var "a") (Var "b"))
 -- lNor (Con (Var "a") (Var "b"))
 -- lNor (Nand (Var "a") (Var "b"))
--- lNor (Dis (Dis (Var "a") (Var "b")) (Dis (Var "c") (Var "d")))
+-- lNor (Nor (Var "a") (Var "b"))
+-- lNor (Con (Dis (Var "a") (Var "b")) (Nand (Var "c") (Var "d")))
 
 --Ejercicio 7
 mSatisface :: Valuacion -> PL -> Bool
@@ -184,6 +211,7 @@ mSatisface ((var,val):sig) pl = case pl of
     Dis a b -> if mSatisface ((var,val):sig) a then True else if mSatisface ((var,val):sig) b then True else False
     Imp a b -> if mSatisface ((var,val):sig) (Neg a) then True else if mSatisface ((var,val):sig) b then True else False
     Nand a b -> if (mSatisface ((var,val):sig) a && mSatisface ((var,val):sig) b) then False else True
+    Nor a b -> if (mSatisface ((var,val):sig) a || mSatisface ((var,val):sig) b) then False else True
 -- Tests
 -- mSatisface [("a",False)] Bot
 -- mSatisface [("a",False)] Top
@@ -203,9 +231,13 @@ mSatisface ((var,val):sig) pl = case pl of
 -- mSatisface [("a",False),("b",True)] (Nand (Var "a") (Var "b"))
 -- mSatisface [("a",True),("b",False)] (Nand (Var "a") (Var "b"))
 -- mSatisface [("a",True),("b",True)] (Nand (Var "a") (Var "b"))
+-- mSatisface [("a",False),("b",False)] (Nor (Var "a") (Var "b"))
+-- mSatisface [("a",False),("b",True)] (Nor (Var "a") (Var "b"))
+-- mSatisface [("a",True),("b",False)] (Nor (Var "a") (Var "b"))
+-- mSatisface [("a",True),("b",True)] (Nor (Var "a") (Var "b"))
 -- mSatisface [("a",False),("b",False)] (Con (Var "a") (Var "b"))
 -- mSatisface [("a",False),("b",True)] (Con (Var "a") (Var "b"))
 -- mSatisface [("a",True),("b",False)] (Con (Var "a") (Var "b"))
 -- mSatisface [("a",True),("b",True)] (Con (Var "a") (Var "b"))
--- mSatisface [("a",False),("b",False),("c",True),("d",False)] (Imp (Dis (Var "a") (Var "b")) (Nand (Var "c") (Var "d")))
+-- mSatisface [("a",False),("b",False),("c",True),("d",False)] (Imp (Dis (Var "a") (Var "b")) (Nor (Var "c") (Var "d")))
 -- mSatisface [("a",True),("b",False),("c",False),("d",False)] (Dis (Nand (Var "a") (Var "b")) (Con (Var "c") (Var "d")))
