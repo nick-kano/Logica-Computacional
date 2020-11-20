@@ -50,7 +50,8 @@ terminoVal ll = case ll of
 
     
 --Nos dice si el elemento PL esta en una lista
--- Ejemplo: 
+-- Ejemplo: estaLista (Var "a") (Dis (Var "a") (Var "b")) -----> True
+--          estaLista (Var "a") (Dis (Var "b") (Var "c")) -----> False
 estaLista :: PL -> [PL] -> Bool
 estaLista p [] = False
 estaLista p (l:ls) = if (p==l) then True else estaLista p ls
@@ -59,16 +60,35 @@ estaLista p (l:ls) = if (p==l) then True else estaLista p ls
 -- Dada phi en DNF, representada como una lista de listas de literales lc,
 -- termListTrue determina si todas las termino de lc son validas.
 -- Es decir clauListTrue determina si todos los elementos de lc son termino validas.
---- Ejemplo:    dnf2LListLit(Var "x") 
+-- Ejemplo:     dnf2LListLit (Var "x") -----> [[x]]
+--              dnf2LListLit (Dis (Dis (Var "a") (Var "b")) (Dis (Var "c") (Var "d"))) ---> [[a],[b],[c],[d]]
+--              dnf2LListLit (Con (Dis (Var "a") (Var "b")) (Dis (Var "c") (Var "d"))) ---> [[a,b],[c,d]]
 dnf2LListLit :: PL -> [[PL]]
 dnf2LListLit phi = case phi of
     Bot -> []
     Var x -> [[Var x]]
     Neg (Var x) -> [[Neg (Var x)]]
-    (Con alpha beta) -> (dnf2LListLit alpha) ++ (dnf2LListLit beta)
+    (Con a b) -> case a of
+        (Con c d) -> case b of
+            (Con e f) -> (dnf2LListLit a)++(dnf2LListLit b)
+            _ -> (dnf2LListLit a)++[disLit2ListLit b]
+        _ -> case b of
+            (Con e f) -> [disLit2ListLit a]++(dnf2LListLit b)
+            _ -> [disLit2ListLit a]++[disLit2ListLit b]
     _ -> error $ "dnf2LListLit: phi no esta en DNF, phi="++(show phi)
 
-
---dnfEstaSAT :: PL -> Bool
---sdnfEstaSAT p = if terminoVal(dnf2LListLit (p)) then True else False
+-- Dada phi en DNF, representada como una lista de listas de literales lc,
+-- termListVal determina si hay terminos de lc validos.
+-- Es decir termListVal determina si hay terminos complementarios.
+-- Ejemplo:     termListVal [[Var "a"],[Var "b"],[Var "c"],[Var "d"]] ---> False
+--              termListVal [[Var "a"],[Var "b"],[Var "c",Neg (Var "c")]] --->True
+termListVal :: [[PL]] -> Bool
+termListVal lc = case lc of
+    [] -> False
+    (c:cs) -> terminoVal c || termListVal cs
+-- Dada phi en DNF, determina si phi esta en Sat.
+-- Ejemplo:     dnfEstaSAT (Con (Dis (Var "a") (Var "b")) (Dis (Var "c") (Neg(Var "c")))) ---> True
+--              dnfEstaSAT (Con (Dis (Var "a") (Var "b")) (Dis (Var "c") (Var "c"))) ---> False
+dnfEstaSAT :: PL -> Bool
+dnfEstaSAT phi = termListVal(dnf2LListLit phi)
 
